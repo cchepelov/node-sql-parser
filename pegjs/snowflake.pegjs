@@ -1981,14 +1981,17 @@ deallocate_stmt
   }
 
 select_stmt
-  = KW_SELECT __ ';' {
+  = KW_SELECT afterSelect:__ ';' {
     // => { type: 'select'; }
     return {
       type: 'select',
+      ws: {
+       afterSelect
+      }
     }
   }
   / select_stmt_nake
-  / s:('(' __ select_stmt __ ')') {
+  / s:('(' beforeSelectStmt:__ select_stmt afterSelectStmt:__ ')') {
     /*
     export interface select_stmt_node extends select_stmt_nake  {
        parentheses: true;
@@ -1998,6 +2001,11 @@ select_stmt
       return {
         ...s[2],
         parentheses_symbol: true,
+        wspc: {
+          ...(s[2].wspc || {}),
+          beforeSelectStmt,
+          afterSelectStmt
+        }
       }
     }
 
@@ -2042,19 +2050,19 @@ distinct_on
   }
 
 select_stmt_nake
-  = __ cte:with_clause? __ KW_SELECT ___
-    opts:option_clause? __
-    d:distinct_on?      __
-    c:column_clause     __
-    ci:into_clause?      __
-    f:from_clause?      __
-    fi:into_clause?      __
-    w:where_clause?     __
-    g:group_by_clause?  __
-    h:having_clause?    __
-    o:order_by_clause?  __
-    l:limit_clause? __
-    win:window_clause? __
+  = beforeWithClause:__ cte:with_clause? afterWithClause:__ KW_SELECT afterSelect:___
+    opts:option_clause? afterOptionClause:__
+    d:distinct_on?      afterDistinctOn:__
+    c:column_clause     afterColumnClause:__
+    ci:into_clause?     afterColumnIntoClause:__
+    f:from_clause?      afterFromClause:__
+    fi:into_clause?     afterFromIntoClause:__
+    w:where_clause?     afterWhereClause:__
+    g:group_by_clause?  afterGroupByClause:__
+    h:having_clause?    afterHavingClause:__
+    o:order_by_clause?  afterOrderByClause:__
+    l:limit_clause?     afterLimitClause:__
+    win:window_clause?  afterWindowClause:__
     li:into_clause? {
       /* => {
           with?: with_clause;
@@ -2079,7 +2087,7 @@ select_stmt_nake
           with: cte,
           type: 'select',
           options: opts,
-          distinct: d,
+          distinct: { ...d, wspc: { ...(d && d.wspc || {}), after: afterDistinctOn } },
           columns: c,
           into: {
             ...(ci || fi || li || {}),
@@ -2090,8 +2098,23 @@ select_stmt_nake
           groupby: g,
           having: h,
           orderby: o,
-          limit: l,
+          limit: { ...l, wspc: { ...(l && l.wspc || {}), after: afterLimitClause } },
           window: win,
+          wspc: {
+            afterSelect,
+            beforeWithClause,
+            afterWithClause,
+            afterOptionClause,
+            afterColumnClause,
+            afterColumnIntoClause,
+            afterFromClause,
+            afterFromIntoClause,
+            afterWhereClause,
+            afterGroupByClause,
+            afterHavingClause,
+            afterOrderByClause,
+            afterWindowClause
+          }
       };
   }
 

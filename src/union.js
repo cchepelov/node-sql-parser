@@ -27,7 +27,7 @@ import { limitToSQL } from './limit'
 import { procToSQL } from './proc'
 import { transactionToSQL } from './transaction'
 import { showToSQL } from './show'
-import { hasVal, toUpper } from './util'
+import { filterResult, toUpper } from './util'
 
 const typeToSQLFn = {
   alter       : alterToSQL,
@@ -62,11 +62,11 @@ const typeToSQLFn = {
   transaction : transactionToSQL,
 }
 
-function unionToSQL(stmt) {
+function unionToSQL(stmt, renderOptions) {
   if (!stmt) return ''
   const fun = typeToSQLFn[stmt.type]
   const { _parentheses, _orderby, _limit } = stmt
-  const res = [_parentheses && '(', fun(stmt)]
+  const res = [_parentheses && '(', fun(stmt, renderOptions)]
   while (stmt._next) {
     const nextFun = typeToSQLFn[stmt._next.type]
     const unionKeyword = toUpper(stmt.set_op)
@@ -74,14 +74,14 @@ function unionToSQL(stmt) {
     stmt = stmt._next
   }
   res.push(_parentheses && ')', orderOrPartitionByToSQL(_orderby, 'order by'), limitToSQL(_limit))
-  return res.filter(hasVal).join(' ')
+  return filterResult(res).join(' ')
 }
 
-function multipleToSQL(stmt) {
+function multipleToSQL(stmt, renderOptions) {
   const res = []
   for (let i = 0, len = stmt.length; i < len; ++i) {
     const astInfo = stmt[i] && stmt[i].ast ? stmt[i].ast : stmt[i]
-    let sql = unionToSQL(astInfo)
+    let sql = unionToSQL(astInfo, renderOptions)
     if (i === len - 1 && astInfo.type === 'transaction') sql = `${sql} ;`
     res.push(sql)
   }

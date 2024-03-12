@@ -56,7 +56,7 @@ function varToSQL(expr) {
 
 exprToSQLConvertFn.var = varToSQL
 
-function exprToSQL(exprOrigin) {
+function exprToSQL(exprOrigin, renderOptions) {
   if (!exprOrigin) return
   const expr = exprOrigin
   if (exprOrigin.ast) {
@@ -66,7 +66,8 @@ function exprToSQL(exprOrigin) {
       expr[key] = ast[key]
     }
   }
-  return exprToSQLConvertFn[expr.type] ? exprToSQLConvertFn[expr.type](expr) : literalToSQL(expr)
+
+  return exprToSQLConvertFn[expr.type] ? exprToSQLConvertFn[expr.type](expr, renderOptions) : literalToSQL(expr)
 }
 
 function unaryToSQL(unarExpr) {

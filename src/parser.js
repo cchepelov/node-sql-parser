@@ -11,12 +11,12 @@ class Parser {
 
   sqlify(ast, opt = DEFAULT_OPT) {
     setParserOpt(opt)
-    return astToSQL(ast, opt)
+    return astToSQL(ast, opt.renderOptions ?? {})
   }
 
   exprToSQL(expr, opt = DEFAULT_OPT) {
     setParserOpt(opt)
-    return exprToSQL(expr)
+    return exprToSQL(expr, opt.renderOptions ?? {})
   }
 
   parse(sql, opt = DEFAULT_OPT) {

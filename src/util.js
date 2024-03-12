@@ -13,9 +13,10 @@ import { columnToSQL, columnRefToSQL, columnOrderToSQL } from './column'
 // }
 
 const DEFAULT_OPT = {
-  database     : PARSER_NAME || 'mysql',
-  type         : 'table',
-  parseOptions : {},
+  database      : PARSER_NAME || 'mysql',
+  type          : 'table',
+  parseOptions  : {},
+  renderOptions : {},
 }
 
 let parserOpt = DEFAULT_OPT
@@ -115,13 +116,14 @@ function setParserOpt(opt) {
   parserOpt = opt
 }
 
-function topToSQL(opt) {
+function topToSQL(opt, renderOptions) {
   if (!opt) return
   const { value, percent, parentheses } = opt
-  const val = parentheses ? `(${value})` : value
-  const prefix = `TOP ${val}`
+  const wspc = (renderOptions && renderOptions.preserveWhitespace) ? (opt.wspc ?? {}) : {}
+  const val = parentheses ? `(${value}${wspc.afterValue ?? ''})` : value
+  const prefix = `TOP${wspc.afterTop ?? ' '}${val}`
   if (!percent) return prefix
-  return `${prefix} ${percent.toUpperCase()}`
+  return `${prefix}${wspc.beforePercent ?? ' '}${percent.toUpperCase()}${wspc.afterPercent ?? ''}`
 }
 
 function columnIdentifierToSql(ident) {
@@ -186,6 +188,13 @@ function toUpper(val) {
 
 function hasVal(val) {
   return val
+}
+function filterResult(result) {
+  const res = result.filter(hasVal)
+  while ((res.length > 0) && !res[res.length - 1].trim()) {
+    res.pop()
+  }
+  return res
 }
 
 function literalToSQL(literal) {
@@ -362,5 +371,5 @@ export {
   connector, commonTypeValue,commentToSQL, createBinaryExpr,
   createValueExpr, dataTypeToSQL, DEFAULT_OPT, escape, literalToSQL, columnIdentifierToSql,
   getParserOpt, identifierToSql, onPartitionsToSQL, replaceParams, returningToSQL,
-  hasVal, setParserOpt, toUpper, topToSQL, triggerEventToSQL,
+  hasVal, filterResult, setParserOpt, toUpper, topToSQL, triggerEventToSQL,
 }
