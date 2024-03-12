@@ -3,15 +3,18 @@ import { columnRefToSQL, columnsToSQL } from './column'
 import { limitToSQL } from './limit'
 import { withToSQL } from './with'
 import { tablesToSQL } from './tables'
-import { hasVal, commonOptionConnector, connector, identifierToSql, topToSQL, toUpper } from './util'
+import { hasVal, filterResult, commonOptionConnector, connector, identifierToSql, topToSQL, toUpper } from './util'
+import { whitespace } from './whitespace'
 
-function distinctToSQL(distinct) {
+function distinctToSQL(distinct, renderOptions) {
   if (!distinct) return
   if (typeof distinct === 'string') return distinct
   const { type, columns } = distinct
+  const wspc = (renderOptions && renderOptions.preserveWhitespace) ? (distinct.wspc ?? {}) : {}
   const result = [toUpper(type)]
   if (columns) result.push(`(${columns.map(columnRefToSQL).join(', ')})`)
-  return result.filter(hasVal).join(' ')
+  result.push(whitespace(wspc.after, ''))
+  return filterResult(result).join(' ')
 }
 
 function selectIntoToSQL(into) {
@@ -53,7 +56,8 @@ function forXmlToSQL(stmt) {
   return `${result.join(' ')}(${exprToSQL(expr)})`
 }
 
-function selectToSQL(stmt) {
+// eslint-disable-next-line max-statements, complexity
+function selectToSQL(stmt, renderOptions) {
   const {
     as_struct_val: asStructVal,
     columns,
@@ -75,30 +79,61 @@ function selectToSQL(stmt) {
     with: withInfo,
     where,
   } = stmt
-  const clauses = [withToSQL(withInfo), 'SELECT', toUpper(asStructVal)]
-  clauses.push(topToSQL(top))
+  const wspc = (renderOptions && renderOptions.preserveWhitespace) ? (stmt.wspc ?? {}) : {}
+  const clauses = []
+  clauses.push(withToSQL({
+    content : withInfo,
+    ...(wspc ? { before: wspc.beforeWithClause, after: wspc.afterWithClause } : {}),
+  }, renderOptions))
+  clauses.push('SELECT')
+  clauses.push(whitespace(wspc.afterSelect, ' '))
+  clauses.push(toUpper(asStructVal, renderOptions))
+  clauses.push(whitespace(wspc.afterAsStructVal, asStructVal ? ' ' : ''))
+  clauses.push(topToSQL(top, renderOptions))
+  clauses.push(whitespace(wspc.afterTop, top ? ' ' : ''))
   if (Array.isArray(options)) clauses.push(options.join(' '))
-  clauses.push(distinctToSQL(distinct), columnsToSQL(columns, from))
+  clauses.push(whitespace(wspc.afterOptionClause, Array.isArray(options) ? ' ' : ''))
+  clauses.push(distinctToSQL(distinct, renderOptions))
+  clauses.push(columnsToSQL(columns, from))
+  clauses.push(whitespace(wspc.afterColumnClause, columns ? ' ' : ''))
   const { position } = into
   let intoSQL = ''
   if (position) intoSQL = commonOptionConnector('INTO', selectIntoToSQL, into)
-  if (position === 'column') clauses.push(intoSQL)
+  if (position === 'column') {
+    clauses.push(intoSQL)
+    clauses.push(whitespace(wspc.afterColumnIntoClause, into ? ' ' : ''))
+  }
   // FROM + joins
   clauses.push(commonOptionConnector('FROM', tablesToSQL, from))
-  if (position === 'from') clauses.push(intoSQL)
+  clauses.push(whitespace(wspc.afterFromClause, from ? ' ' : ''))
+  if (position === 'from') {
+    clauses.push(intoSQL)
+    clauses.push(whitespace(wspc.afterFromIntoClause, into ? ' ' : ''))
+  }
   const { keyword, expr } = forSystem || {}
   clauses.push(commonOptionConnector(keyword, exprToSQL, expr))
   clauses.push(commonOptionConnector('WHERE', exprToSQL, where))
+  clauses.push(whitespace(wspc.afterWhereClause, where ? ' ' : ''))
   clauses.push(connector('GROUP BY', getExprListSQL(groupby).join(', ')))
+  clauses.push(whitespace(wspc.afterGroupByClause, groupby ? ' ' : ''))
   clauses.push(commonOptionConnector('HAVING', exprToSQL, having))
+  clauses.push(whitespace(wspc.afterHavingClause, having ? ' ' : ''))
   clauses.push(commonOptionConnector('QUALIFY', exprToSQL, qualify))
+  clauses.push(whitespace(wspc.afterQualifyClause, qualify ? ' ' : ''))
   clauses.push(commonOptionConnector('WINDOW', exprToSQL, windowInfo))
+  clauses.push(whitespace(wspc.afterWindowClause, windowInfo ? ' ' : ''))
   clauses.push(orderOrPartitionByToSQL(orderby, 'order by'))
-  clauses.push(limitToSQL(limit))
+  clauses.push(whitespace(wspc.afterOrderByClause, orderby ? ' ' : ''))
+  clauses.push(limitToSQL(limit, renderOptions))
   clauses.push(toUpper(lockingRead))
-  if (position === 'end') clauses.push(intoSQL)
-  clauses.push(forXmlToSQL(forXml))
-  const sql = clauses.filter(hasVal).join(' ')
+  clauses.push(whitespace(wspc.afterLockingRead, lockingRead ? ' ' : ''))
+  if (position === 'end') {
+    clauses.push(intoSQL)
+    clauses.push(whitespace(wspc.afterEndIntoClause, into ? ' ' : ''))
+  }
+  clauses.push(forXmlToSQL(forXml, renderOptions))
+  clauses.push(whitespace(wspc.afterForXmlClause, forXml ? ' ' : ''))
+  const sql = filterResult(clauses).join('')
   return parentheses ? `(${sql})` : sql
 }
 

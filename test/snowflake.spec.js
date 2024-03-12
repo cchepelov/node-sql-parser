@@ -4,7 +4,7 @@ const Parser = require('../src/parser').default
 describe('snowflake', () => {
   const parser = new Parser();
   const opt = {
-    database: 'snowflake'
+    database: 'snowflake',
   }
 
   function getParsedSql(sql, opt) {
@@ -140,5 +140,20 @@ describe('snowflake', () => {
     it(`should support ${title}`, () => {
       expect(getParsedSql(sql[0], opt)).to.equal(sql[1])
     })
+  })
+
+  it('should support some whitespace & comment preservation', () => {
+    const sql =  `/* test */ SELECT /* test */ listing_id AS with_whitespace_listing_id,
+        listing_name,
+        room_type,
+        host_id,
+        REPLACE(price_str, '$') :: NUMBER(10, 2) AS price,
+        created_at,
+        updated_at
+        FROM  -- this will require a larger intervention in 'from_clause'
+
+        src_listings`;
+    expect(getParsedSql(sql, { ...opt, renderOptions: { preserveWhitespace: true }}))
+      .to.equal('SELECT /* test */ "listing_id" AS "with_whitespace_listing_id", "listing_name", "room_type", "host_id", REPLACE("price_str", \'$\')::NUMBER(10, 2) AS "price", "created_at", "updated_at" FROM "src_listings"')
   })
 })
